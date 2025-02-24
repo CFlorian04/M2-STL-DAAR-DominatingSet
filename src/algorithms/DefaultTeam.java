@@ -13,43 +13,60 @@ public class DefaultTeam {
         // Calculer la carte des voisins une seule fois et la réutiliser
         Map<Point, List<Point>> neighborsMap = calculateNeighborsMap(points, edgeThreshold);
 
-        ArrayList<Point> result = gloutonDominatingSet(points, neighborsMap);
+        ArrayList<Point> result = gloutonDominatingSet(points, edgeThreshold, neighborsMap);
         result = remove2add1(result, points, edgeThreshold, neighborsMap);
-        result = remove3add2(result, points, edgeThreshold, neighborsMap);
+        //result = remove3add2(result, points, edgeThreshold, neighborsMap);
 
         log("End of Dominating Set calculation...");
         return result;
     }
 
-    private ArrayList<Point> gloutonDominatingSet(ArrayList<Point> points, Map<Point, List<Point>> neighborsMap) {
+    private ArrayList<Point> gloutonDominatingSet(ArrayList<Point> points, int edgeThreshold, Map<Point, List<Point>> neighborsMap) {
         long startTime = System.currentTimeMillis();
         log("[Glouton] Start of the algorithm...");
         ArrayList<Point> dominatedSet = new ArrayList<>();
         HashSet<Point> dominated = new HashSet<>();
+        ArrayList<Point> newPoints = new ArrayList<>(points);
+        Map<Point, List<Point>> newNeighborsMap = neighborsMap;
         PriorityQueue<Point> priorityQueue = new PriorityQueue<>(
                 Comparator.comparingInt(pt -> neighborsMap.get(pt).size()).reversed()
         );
 
 
-        // Initialisation de la file de priorité
-        for (Point point : points) {
-            if (neighborsMap.get(point).isEmpty()) {
-                dominated.add(point);
-                dominatedSet.add(point);
-            } else {
-                priorityQueue.add(point);
+        while (!dominated.containsAll(points)) {
+            // Initialisation de la file de priorité
+            for (Point point : newPoints) {
+                if (newNeighborsMap.get(point).isEmpty()) {
+                    dominated.add(point);
+                    dominatedSet.add(point);
+                } else {
+                    priorityQueue.add(point);
+                }
             }
+
+            Point p = priorityQueue.poll();
+
+            log("[Glouton] Point neighbor size: " + neighborsMap.get(p).size());
+
+            if (!dominated.contains(p)) {
+                dominated.add(p);
+                dominatedSet.add(p);
+                dominated.addAll(neighborsMap.get(p));
+
+                newPoints.removeAll(dominated);
+                newNeighborsMap = calculateNeighborsMap(newPoints, edgeThreshold);
+                Map<Point, List<Point>> finalNewNeighborsMap = newNeighborsMap;
+
+                priorityQueue.clear();
+                priorityQueue = new PriorityQueue<>(
+                        Comparator.comparingInt(pt -> finalNewNeighborsMap.get(pt).size()).reversed()
+                );
+
+            }
+
         }
 
-        while (!dominated.containsAll(points)) {
-            Point p = priorityQueue.poll();
-            if (dominated.contains(p)) {
-                continue;
-            }
-            dominated.add(p);
-            dominatedSet.add(p);
-            dominated.addAll(neighborsMap.get(p));
-        }
+
 
         long endTime = System.currentTimeMillis();
 
@@ -108,7 +125,7 @@ public class DefaultTeam {
                             dominatedSet = newDominatedSet;
                             improved = true;
                             deletedDominatedPoints++;
-                            log("[remove2add1] Replaced points " + p1.toString() + " and " + p2.toString() + " with point " + newPoint.toString());
+                            //log("[remove2add1] Replaced points " + p1.toString() + " and " + p2.toString() + " with point " + newPoint.toString());
                             break outerLoop;
                         }
                     }
@@ -171,7 +188,7 @@ public class DefaultTeam {
                                     dominatedSet = newDominatedSet;
                                     improved = true;
                                     deletedDominatedPoints++;
-                                    log("[remove3add2] Replaced points " + p1.toString() + ", " + p2.toString() + ", " + p3.toString() + " with point " + newPoint1.toString() + ", " + newPoint2.toString());
+                                    //log("[remove3add2] Replaced points " + p1.toString() + ", " + p2.toString() + ", " + p3.toString() + " with point " + newPoint1.toString() + ", " + newPoint2.toString());
                                     break outerLoop;
                                 }
                             }
