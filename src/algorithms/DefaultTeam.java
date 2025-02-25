@@ -7,15 +7,29 @@ import java.util.stream.Collectors;
 
 public class DefaultTeam {
     private boolean showLog = true; // Variable pour activer/désactiver les logs
-    private boolean showDetails = true;
-    private double precision = 2.5;
+    private boolean showDetails = false;
+    private double precision = 1;
+
+    private String filename = "result";
+    private int filecount = 0;
 
     public ArrayList<Point> calculDominatingSet(ArrayList<Point> points, int edgeThreshold) {
         log("Start of Dominating Set calculation...");
 
-        ArrayList<Point> result = gloutonDominatingSet(points, edgeThreshold);
-        result = remove2add1(result, points, edgeThreshold);
-        result = remove3add2(result, points, edgeThreshold);
+        String localFilename = filename + filecount + ".points";
+        ArrayList<Point> result = new ArrayList<>();
+
+        if(readFromFile(localFilename).isEmpty()) {
+            result = gloutonDominatingSet(points, edgeThreshold);
+            result = remove2add1(result, points, edgeThreshold);
+            result = remove3add2(result, points, edgeThreshold);
+            saveToFile(filename, result);
+
+        } else {
+            result = readFromFile(localFilename);
+        }
+
+        filecount++;
 
         log("End of Dominating Set calculation...");
         return result;
@@ -125,7 +139,6 @@ public class DefaultTeam {
         log("[remove2add1] End of the algorithm (" + (endTime - startTime) + "ms).");
         return dominatedSet;
     }
-
 
     private ArrayList<Point> remove3add2(ArrayList<Point> dominatedSet, ArrayList<Point> points, int edgeThreshold) {
         long startTime = System.currentTimeMillis();
@@ -263,12 +276,8 @@ public class DefaultTeam {
     }
 
     private void saveToFile(String filename, ArrayList<Point> result) {
-        int index = 0;
-        File file = new File(filename + Integer.toString(index) + ".points");
-        while (file.exists()) {
-            index++;
-            file = new File(filename + Integer.toString(index) + ".points");
-        }
+        String directory = "results/";
+        File file = new File(directory + filename + Integer.toString(filecount) + ".points");
         printToFile(file.getPath(), result);
         log("Saved to file: " + file.getPath());
     }
@@ -285,8 +294,9 @@ public class DefaultTeam {
     }
 
     private ArrayList<Point> readFromFile(String filename) {
+        String directory = "results/";
         ArrayList<Point> points = new ArrayList<>();
-        try (BufferedReader input = new BufferedReader(new InputStreamReader(new FileInputStream(filename)))) {
+        try (BufferedReader input = new BufferedReader(new InputStreamReader(new FileInputStream(directory + filename)))) {
             String line;
             while ((line = input.readLine()) != null) {
                 String[] coordinates = line.split("\\s+");
@@ -300,4 +310,5 @@ public class DefaultTeam {
         log("Read from file: " + filename);
         return points;
     }
+
 }
