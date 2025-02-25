@@ -7,63 +7,34 @@ import java.util.stream.Collectors;
 
 public class DefaultTeam {
     private boolean showLog = true; // Variable pour activer/désactiver les logs
+    private boolean showDetails = true;
+    private double precision = 2.5;
 
     public ArrayList<Point> calculDominatingSet(ArrayList<Point> points, int edgeThreshold) {
         log("Start of Dominating Set calculation...");
 
         ArrayList<Point> result = gloutonDominatingSet(points, edgeThreshold);
-        //result = remove2add1(result, points, edgeThreshold);
-        //result = remove3add2(result, points, edgeThreshold);
+        result = remove2add1(result, points, edgeThreshold);
+        result = remove3add2(result, points, edgeThreshold);
 
         log("End of Dominating Set calculation...");
         return result;
     }
 
-//    private ArrayList<Point> greedy(ArrayList<Point> points, int edgeThreshold) {
-//        long startTime = System.currentTimeMillis();
-//        log("[Greedy] Start of the algorithm...");
-//        ArrayList<Point> ps = new ArrayList<>(points);
-//        ArrayList<Point> dominatingPoints = getAlonePoints(points, edgeThreshold);
-//        ps.removeAll(dominatingPoints);
-//        if (ps.isEmpty())
-//            return dominatingPoints;
-//        Point p;
-//        do {
-//            p = getGreatestDegreePoint(ps, edgeThreshold);
-//            dominatingPoints.add(p);
-//            ps.removeAll(neighbor(p, ps, edgeThreshold));
-//            ps.remove(p);
-//            log("[Greedy] Point neighbor size: " + neighbor(p, ps, edgeThreshold).size());
-//        } while (!ps.isEmpty());
-//        dominatingPoints = cleanDominatingSet(dominatingPoints, points, edgeThreshold);
-//
-//        long endTime = System.currentTimeMillis();
-//
-//        log("[Greedy] " + dominatingPoints.size() + " dominated points.");
-//        log("[Greedy] End of the algorithm (" + (endTime - startTime) + "ms).");
-//
-//        return dominatingPoints;
-//    }
-
     private ArrayList<Point> gloutonDominatingSet(ArrayList<Point> points, int edgeThreshold) {
         long startTime = System.currentTimeMillis();
         log("[Glouton] Start of the algorithm...");
 
-        ArrayList<Point> dominatedSet = new ArrayList<>(getAlonePoints(points, edgeThreshold));
-        HashSet<Point> dominated = new HashSet<>(getAlonePoints(points, edgeThreshold));
-        ArrayList<Point> newPoints = new ArrayList<>(points);
-
         Map<Point, List<Point>> neighborsMap = calculateNeighborsMap(points, edgeThreshold);
-        Map<Point, List<Point>> finalNeighborsMap = neighborsMap;
-        PriorityQueue<Point> priorityQueue = new PriorityQueue<>(
-                Comparator.comparingInt(pt -> finalNeighborsMap.get(pt).size()).reversed()
-        );
+        Map<Point, List<Point>> finalNeighborsMap1 = neighborsMap;
+        PriorityQueue<Point> priorityQueue = new PriorityQueue<>(Comparator.comparingInt(pt -> finalNeighborsMap1.get(pt).size()).reversed());
 
+        ArrayList<Point> dominatedSet = getAlonePoints(neighborsMap);
+        HashSet<Point> dominated = new HashSet<>(dominatedSet);
+        ArrayList<Point> newPoints = new ArrayList<>(points);
         newPoints.removeAll(dominatedSet);
 
-
         while (!dominated.containsAll(points)) {
-            // Initialisation de la file de priorité
             for (Point point : newPoints) {
                 if (neighborsMap.get(point).isEmpty()) {
                     dominated.add(point);
@@ -75,8 +46,6 @@ public class DefaultTeam {
 
             Point p = priorityQueue.poll();
 
-            log("[Glouton] Point neighbor size: " + neighborsMap.get(p).size());
-
             if (!dominated.contains(p)) {
                 dominated.add(p);
                 dominatedSet.add(p);
@@ -84,26 +53,19 @@ public class DefaultTeam {
 
                 newPoints.removeAll(dominated);
                 neighborsMap = calculateNeighborsMap(newPoints, edgeThreshold);
-                Map<Point, List<Point>> finalNewNeighborsMap = neighborsMap;
-
                 priorityQueue.clear();
-                priorityQueue = new PriorityQueue<>(
-                        Comparator.comparingInt(pt -> finalNewNeighborsMap.get(pt).size()).reversed()
-                );
-
+                Map<Point, List<Point>> finalNeighborsMap = neighborsMap;
+                priorityQueue = new PriorityQueue<>(Comparator.comparingInt(pt -> finalNeighborsMap.get(pt).size()).reversed());
             }
-
         }
 
         dominatedSet = cleanDominatingSet(dominatedSet, points, edgeThreshold);
 
         long endTime = System.currentTimeMillis();
-
         log("[Glouton] " + dominatedSet.size() + " dominated points.");
         log("[Glouton] End of the algorithm (" + (endTime - startTime) + "ms).");
         return dominatedSet;
     }
-
 
     private Map<Point, List<Point>> calculateNeighborsMap(ArrayList<Point> points, int edgeThreshold) {
         Map<Point, List<Point>> neighborsMap = new HashMap<>();
@@ -114,19 +76,15 @@ public class DefaultTeam {
     }
 
     private ArrayList<Point> neighbor(Point p, ArrayList<Point> vertices, int edgeThreshold) {
-        ArrayList<Point> result = new ArrayList<>();
-        for (Point point : vertices) {
-            if (point.distance(p) < edgeThreshold && !point.equals(p)) {
-                result.add((Point) point.clone());
-            }
-        }
-        return result;
+        return vertices.stream().filter(point -> point.distance(p) < edgeThreshold && !point.equals(p)).collect(Collectors.toCollection(ArrayList::new));
     }
 
     private ArrayList<Point> remove2add1(ArrayList<Point> dominatedSet, ArrayList<Point> points, int edgeThreshold) {
         long startTime = System.currentTimeMillis();
         log("[remove2add1] Start of the algorithm...");
         int deletedDominatedPoints = 0;
+
+        Map<Point, List<Point>> neighborsMap = calculateNeighborsMap(points, edgeThreshold);
 
         boolean improved = true;
         while (improved) {
@@ -150,11 +108,11 @@ public class DefaultTeam {
                         newDominatedSet.remove(p1);
                         newDominatedSet.remove(p2);
                         newDominatedSet.add(newPoint);
-                        if (isDominatingSet(newDominatedSet, points, edgeThreshold)) {
+                        if (isDominatingSet(newDominatedSet, points, edgeThreshold, neighborsMap)) {
                             dominatedSet = newDominatedSet;
                             improved = true;
                             deletedDominatedPoints++;
-                            log("[remove2add1] Replaced points " + p1.toString() + " and " + p2.toString() + " with point " + newPoint.toString());
+                            detail_log("[remove2add1] Replaced points " + p1.toString() + " and " + p2.toString() + " with point " + newPoint.toString());
                             break outerLoop;
                         }
                     }
@@ -168,53 +126,84 @@ public class DefaultTeam {
         return dominatedSet;
     }
 
+
     private ArrayList<Point> remove3add2(ArrayList<Point> dominatedSet, ArrayList<Point> points, int edgeThreshold) {
         long startTime = System.currentTimeMillis();
         log("[remove3add2] Start of the algorithm...");
         boolean improved = true;
         int deletedDominatedPoints = 0;
 
+        ArrayList<Point> newDominatedSet = new ArrayList<>();
+        Map<Point, List<Point>> neighborsMap = calculateNeighborsMap(points, edgeThreshold);
+        Set<Point> dominatedSetHash = new HashSet<>(dominatedSet);
+        Set<Point> pointsHash = new HashSet<>(points);
+
+        int index = 0;
+
         while (improved) {
             improved = false;
             outerLoop:
-            for (int i = 0; i < dominatedSet.size() - 2; i++) {
+            for (int i = index; i < dominatedSetHash.size(); i++) {
                 Point p1 = dominatedSet.get(i);
-                for (int j = i + 1; j < dominatedSet.size() - 1; j++) {
-                    Point p2 = dominatedSet.get(j);
-                    if (p1.distance(p2) > 2 * edgeThreshold) {
-                        continue;
-                    }
-                    for (int k = j + 1; k < dominatedSet.size(); k++) {
-                        Point p3 = dominatedSet.get(k);
+                ArrayList<Point> p1Neighbors = neighbor(p1, dominatedSet, 2 * edgeThreshold);
 
-                        if (p2.distance(p3) > 2 * edgeThreshold || p3.distance(p1) > 2 * edgeThreshold) {
+                detail_log("[remove3add2] Treated : " + i + "/" + dominatedSetHash.size());
+
+                for (int j = 0; j < p1Neighbors.size(); j++) {
+                    Point p2 = p1Neighbors.get(j);
+                    ArrayList<Point> p2Neighbors = neighbor(p2, dominatedSet, 2 * edgeThreshold);
+
+
+                    for (int k = 0; k < p2Neighbors.size(); k++) {
+                        Point p3 = p2Neighbors.get(k);
+
+
+                        if (p3.equals(p1)) {
                             continue;
                         }
-                        for (Point newPoint1 : points) {
-                            if (dominatedSet.contains(newPoint1)) {
+
+                        ArrayList<Point> allNeighborPoints = new ArrayList<>();
+                        allNeighborPoints.addAll(neighbor(p1, points, 2 * edgeThreshold));
+                        allNeighborPoints.addAll(neighbor(p2, points, 2 * edgeThreshold));
+                        allNeighborPoints.addAll(neighbor(p3, points, 2 * edgeThreshold));
+
+                        for (Point newPoint1 : allNeighborPoints) {
+
+                            if (dominatedSetHash.contains(newPoint1)) {
                                 continue;
                             }
-                            if (p1.distance(newPoint1) > 2 * edgeThreshold || p2.distance(newPoint1) > 2 * edgeThreshold || p3.distance(newPoint1) > 2 * edgeThreshold) {
+
+                            if (    p1.distance(newPoint1) > precision * edgeThreshold
+                                    || p2.distance(newPoint1) > precision * edgeThreshold
+                                    || p3.distance(newPoint1) > precision * edgeThreshold) {
                                 continue;
                             }
-                            for (Point newPoint2 : points) {
-                                if (newPoint1.equals(newPoint2) || dominatedSet.contains(newPoint2)) {
+
+                            for (Point newPoint2 : allNeighborPoints) {
+
+                                if (newPoint1.equals(newPoint2) || dominatedSetHash.contains(newPoint2)) {
                                     continue;
                                 }
-                                if (p1.distance(newPoint2) > 2 * edgeThreshold || p2.distance(newPoint2) > 2 * edgeThreshold || p3.distance(newPoint2) > 2 * edgeThreshold) {
+
+                                if (    p1.distance(newPoint2) > precision * edgeThreshold
+                                        || p2.distance(newPoint2) > precision * edgeThreshold
+                                        || p3.distance(newPoint2) > precision * edgeThreshold) {
                                     continue;
                                 }
-                                ArrayList<Point> newDominatedSet = new ArrayList<>(dominatedSet);
+
+                                newDominatedSet = new ArrayList<>(dominatedSet);
                                 newDominatedSet.remove(p1);
                                 newDominatedSet.remove(p2);
                                 newDominatedSet.remove(p3);
                                 newDominatedSet.add(newPoint1);
                                 newDominatedSet.add(newPoint2);
-                                if (isDominatingSet(newDominatedSet, points, edgeThreshold)) {
+                                if (isDominatingSet(newDominatedSet, points, edgeThreshold, neighborsMap)) {
                                     dominatedSet = newDominatedSet;
+                                    dominatedSetHash = new HashSet<>(dominatedSet);
                                     improved = true;
                                     deletedDominatedPoints++;
-                                    log("[remove3add2] Replaced points " + p1.toString() + ", " + p2.toString() + ", " + p3.toString() + " with point " + newPoint1.toString() + ", " + newPoint2.toString());
+                                    index = i + 1;
+                                    detail_log("[remove3add2] Replaced points " + p1 + ", " + p2 + ", " + p3 + " with points " + newPoint1 + ", " + newPoint2);
                                     break outerLoop;
                                 }
                             }
@@ -230,10 +219,8 @@ public class DefaultTeam {
         return dominatedSet;
     }
 
-
-    private boolean isDominatingSet(ArrayList<Point> dominatingSet, ArrayList<Point> points, int edgeThreshold) {
+    private boolean isDominatingSet(ArrayList<Point> dominatingSet, ArrayList<Point> points, int edgeThreshold, Map<Point, List<Point>> neighborsMap) {
         HashSet<Point> dominated = new HashSet<>(dominatingSet);
-        Map<Point, List<Point>> neighborsMap = calculateNeighborsMap(points, edgeThreshold);
         for (Point p : dominatingSet) {
             dominated.addAll(neighborsMap.get(p));
         }
@@ -242,10 +229,10 @@ public class DefaultTeam {
 
     private ArrayList<Point> cleanDominatingSet(ArrayList<Point> dominatingSet, ArrayList<Point> points, int edgeThreshold) {
         ArrayList<Point> cleanDominatingSet = new ArrayList<>(dominatingSet);
-
+        Map<Point, List<Point>> neighborsMap = calculateNeighborsMap(points, edgeThreshold);
         for (Point p : dominatingSet) {
             cleanDominatingSet.remove(p);
-            if (!isDominatingSet(cleanDominatingSet, points, edgeThreshold)) {
+            if (!isDominatingSet(cleanDominatingSet, points, edgeThreshold, neighborsMap)) {
                 cleanDominatingSet.add(p);
             }
         }
@@ -254,11 +241,8 @@ public class DefaultTeam {
         return cleanDominatingSet;
     }
 
-    private ArrayList<Point> getAlonePoints(ArrayList<Point> points, int edgeThreshold) {
-        return calculateNeighborsMap(points, edgeThreshold).entrySet().stream()
-                .filter(e -> e.getValue().isEmpty())
-                .map(Map.Entry::getKey)
-                .collect(Collectors.toCollection(ArrayList::new));
+    private ArrayList<Point> getAlonePoints(Map<Point, List<Point>> neighborsMap) {
+        return neighborsMap.entrySet().stream().filter(e -> e.getValue().isEmpty()).map(Map.Entry::getKey).collect(Collectors.toCollection(ArrayList::new));
     }
 
     private Point getGreatestDegreePoint(ArrayList<Point> points, int edgeThreshold) {
@@ -266,14 +250,18 @@ public class DefaultTeam {
         return points.stream().max(comp).orElseThrow(IllegalArgumentException::new);
     }
 
-    // Méthode pour afficher les logs
     private void log(String message) {
         if (showLog) {
             System.out.println(message);
         }
     }
 
-    // FILE PRINTER
+    private void detail_log(String message) {
+        if (showDetails) {
+            System.out.println(message);
+        }
+    }
+
     private void saveToFile(String filename, ArrayList<Point> result) {
         int index = 0;
         File file = new File(filename + Integer.toString(index) + ".points");
@@ -296,7 +284,6 @@ public class DefaultTeam {
         log("Printed to file: " + filename);
     }
 
-    // FILE LOADER
     private ArrayList<Point> readFromFile(String filename) {
         ArrayList<Point> points = new ArrayList<>();
         try (BufferedReader input = new BufferedReader(new InputStreamReader(new FileInputStream(filename)))) {
