@@ -8,32 +8,43 @@ import java.util.stream.Collectors;
 public class DefaultTeam {
     private boolean showLog = true; // Variable pour activer/désactiver les logs
     private boolean showDetails = false;
-    private double precision = 1;
-
-    private String filename = "result";
-    private int filecount = 0;
+    private double precision = 2.5;
 
     public ArrayList<Point> calculDominatingSet(ArrayList<Point> points, int edgeThreshold) {
-        log("Start of Dominating Set calculation...");
-
-        String localFilename = filename + filecount + ".points";
         ArrayList<Point> result = new ArrayList<>();
+        Map<Point, List<Point>> neighborsMap = calculateNeighborsMap(points, edgeThreshold);
 
-        if(readFromFile(localFilename).isEmpty()) {
-            result = gloutonDominatingSet(points, edgeThreshold);
-            result = remove2add1(result, points, edgeThreshold);
-            result = remove3add2(result, points, edgeThreshold);
-            saveToFile(filename, result);
+        File resultsDirectory = new File("results/");
+        if (!resultsDirectory.exists()) {
+            resultsDirectory.mkdir();
+        }
+        File[] files = resultsDirectory.listFiles();
+        if (files != null) {
+            for (File fileEntry : files) {
 
-        } else {
-            result = readFromFile(localFilename);
+                result = readFromFile(fileEntry.getName());
+                //log(fileEntry.getName());
+                assert result != null;
+                if (!result.isEmpty())
+                    if (isDominatingSet(result, points, edgeThreshold, neighborsMap)) {
+                        log("Load from file (" + fileEntry.getName() +") : " + result.size() + " dominated points.");
+                        return result;
+                    }
+            }
         }
 
-        filecount++;
+        log("Start of Dominating Set calculation...");
 
-        log("End of Dominating Set calculation...");
+        result.clear();
+        result = gloutonDominatingSet(points, edgeThreshold);
+        result = remove2add1(result, points, edgeThreshold);
+        result = remove3add2(result, points, edgeThreshold);
+        saveToFile("result", result);
+
+        log("End of Dominating Set calculation : " + result.size() + " dominated points.");
         return result;
     }
+
 
     private ArrayList<Point> gloutonDominatingSet(ArrayList<Point> points, int edgeThreshold) {
         long startTime = System.currentTimeMillis();
@@ -186,7 +197,7 @@ public class DefaultTeam {
                                 continue;
                             }
 
-                            if (    p1.distance(newPoint1) > precision * edgeThreshold
+                            if (p1.distance(newPoint1) > precision * edgeThreshold
                                     || p2.distance(newPoint1) > precision * edgeThreshold
                                     || p3.distance(newPoint1) > precision * edgeThreshold) {
                                 continue;
@@ -198,7 +209,7 @@ public class DefaultTeam {
                                     continue;
                                 }
 
-                                if (    p1.distance(newPoint2) > precision * edgeThreshold
+                                if (p1.distance(newPoint2) > precision * edgeThreshold
                                         || p2.distance(newPoint2) > precision * edgeThreshold
                                         || p3.distance(newPoint2) > precision * edgeThreshold) {
                                     continue;
@@ -235,12 +246,18 @@ public class DefaultTeam {
     private boolean isDominatingSet(ArrayList<Point> dominatingSet, ArrayList<Point> points, int edgeThreshold, Map<Point, List<Point>> neighborsMap) {
         HashSet<Point> dominated = new HashSet<>(dominatingSet);
         for (Point p : dominatingSet) {
-            dominated.addAll(neighborsMap.get(p));
+            ArrayList<Point> pointNeighborsMap = (ArrayList<Point>) neighborsMap.get(p);
+            if (pointNeighborsMap != null) {
+                dominated.addAll(pointNeighborsMap);
+            }
         }
         return dominated.containsAll(points);
     }
 
     private ArrayList<Point> cleanDominatingSet(ArrayList<Point> dominatingSet, ArrayList<Point> points, int edgeThreshold) {
+        if (dominatingSet == null) {
+            return new ArrayList<>();
+        }
         ArrayList<Point> cleanDominatingSet = new ArrayList<>(dominatingSet);
         Map<Point, List<Point>> neighborsMap = calculateNeighborsMap(points, edgeThreshold);
         for (Point p : dominatingSet) {
@@ -253,6 +270,7 @@ public class DefaultTeam {
         log("[Clean] From " + dominatingSet.size() + " to " + cleanDominatingSet.size() + " dominated points.");
         return cleanDominatingSet;
     }
+
 
     private ArrayList<Point> getAlonePoints(Map<Point, List<Point>> neighborsMap) {
         return neighborsMap.entrySet().stream().filter(e -> e.getValue().isEmpty()).map(Map.Entry::getKey).collect(Collectors.toCollection(ArrayList::new));
@@ -275,9 +293,15 @@ public class DefaultTeam {
         }
     }
 
+
     private void saveToFile(String filename, ArrayList<Point> result) {
-        String directory = "results/";
-        File file = new File(directory + filename + Integer.toString(filecount) + ".points");
+        String directory = "./results/";
+        int index = 0;
+        File file = new File(directory + filename + Integer.toString(index) + ".points");
+        while (file.exists()) {
+            index++;
+            file = new File(directory + filename + Integer.toString(index) + ".points");
+        }
         printToFile(file.getPath(), result);
         log("Saved to file: " + file.getPath());
     }
@@ -290,11 +314,11 @@ public class DefaultTeam {
         } catch (FileNotFoundException e) {
             System.err.println("I/O exception: unable to create " + filename);
         }
-        log("Printed to file: " + filename);
+        //log("Printed to file: " + filename);
     }
 
     private ArrayList<Point> readFromFile(String filename) {
-        String directory = "results/";
+        String directory = "./results/";
         ArrayList<Point> points = new ArrayList<>();
         try (BufferedReader input = new BufferedReader(new InputStreamReader(new FileInputStream(directory + filename)))) {
             String line;
@@ -307,8 +331,8 @@ public class DefaultTeam {
         } catch (IOException e) {
             System.err.println("Exception: interrupted I/O while reading " + filename);
         }
-        log("Read from file: " + filename);
-        return points;
+        return points.isEmpty() ? null : points;
     }
+
 
 }
